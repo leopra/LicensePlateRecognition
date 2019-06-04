@@ -8,9 +8,9 @@ e:\leoprat\documents\license plate recognition git\licenseplaterecognition\proje
           [
               _Tp=float
           ]
-e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(136): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
-e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(138): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
-e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(152): warning C4244: '=': conversion from '_Tp' to '_Tp', possible loss of data
+e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(163): warning C4244: '=': conversion from 'double' to 'float', possible loss of data
+e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(165): warning C4244: 'argument': conversion from 'time_t' to 'unsigned int', possible loss of data
+e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(179): warning C4244: '=': conversion from '_Tp' to '_Tp', possible loss of data
           with
           [
               _Tp=float
@@ -19,7 +19,7 @@ e:\leoprat\documents\license plate recognition git\licenseplaterecognition\proje
           [
               _Tp=int
           ]
-e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(153): warning C4244: '=': conversion from '_Tp' to '_Tp', possible loss of data
+e:\leoprat\documents\license plate recognition git\licenseplaterecognition\project1\main.cpp(180): warning C4244: '=': conversion from '_Tp' to '_Tp', possible loss of data
           with
           [
               _Tp=float

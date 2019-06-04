@@ -70,7 +70,7 @@ bool verifySizes(RotatedRect candidate) {
 	}
 }
 
-void initialProcessing(Mat input) {
+void initialProcessing(Mat input, String name) {
 
 	// conversion to gray and blur
 	Mat img_gray;
@@ -81,19 +81,25 @@ void initialProcessing(Mat input) {
 	Mat img_sobel;
 	Sobel(img_gray, img_sobel, CV_8U, 1, 0, 3, 1, 0);
 
+	/*imshow("test", img_sobel);
+	waitKey(0)*/;
 	/*After a Sobel filter, we apply a threshold filter to obtain a binary image with a threshold value obtained
 		through Otsu's method. Otsu's algorithm needs an 8 - bit input image and Otsu's method automatically
 		determines the optimal threshold value :*/
 		//threshold image
 	Mat img_threshold;
-	threshold(img_sobel, img_threshold, 0, 255, THRESH_OTSU + THRESH_BINARY);
+	threshold(img_sobel, img_threshold, 230, 255, THRESH_OTSU + THRESH_BINARY);
 
+	/*imshow("test", img_threshold);
+	waitKey(0);*/
 	/*By applying a close morphological operation, we can remove blank spaces between each vertical edge
 		line, and connect all regions that have a high number of edges.In this step we have the possible regions
 		that can contain plates.*/
 	Mat element = getStructuringElement(MORPH_RECT, Size(17, 3));
 	morphologyEx(img_threshold, img_threshold, MORPH_CLOSE, element);
 
+	/*imshow("dilate", img_threshold);
+	waitKey(0);*/
 	//Find contours of possibles plates
 	vector< vector< Point> > contours;
 	findContours(img_threshold,
@@ -104,26 +110,47 @@ void initialProcessing(Mat input) {
 	//Start to iterate to each contour found
 	vector<vector<Point> >::iterator itc = contours.begin();
 	vector<RotatedRect> rects;
-	//Remove patch that has no inside limits of aspect ratio and area.
-	while (itc != contours.end()) {
-		//Create bounding rect of object
-		RotatedRect mr = minAreaRect(Mat(*itc));
-		if (!verifySizes(mr)) {
-			itc = contours.erase(itc);
-		}
-		else {
-			++itc;
-			rects.push_back(mr);
-		}
-	}
 
-	// Draw blue contours on a white image
 	cv::Mat result;
 	input.copyTo(result);
 	cv::drawContours(result, contours,
 		-1, // draw all contours
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
+
+	imshow("all contours", result);
+	waitKey(0);
+
+	int color = 0;
+	//Remove patch that has no inside limits of aspect ratio and area.
+	while (itc != contours.end()) {
+		//Create bounding rect of object
+		RotatedRect mr = minAreaRect(Mat(*itc));
+		if (!verifySizes(mr)) {
+			itc = contours.erase(itc);
+			//cv::drawContours(result, contours,
+			//	-1, // draw all contours
+			//	cv::Scalar(color + 5 , color + 2, 0), // in blue
+			//	1); // with a thickness of 1
+			//imshow("all contours", result);
+			//waitKey(0);
+		}
+		else {
+			++itc;
+			rects.push_back(mr);
+		}
+		//result = input;
+	}
+
+	// Draw blue contours on a white image
+
+	input.copyTo(result);
+	cv::drawContours(result, contours,
+		-1, // draw all contours
+		cv::Scalar(255, 0, 0), // in blue
+		1); // with a thickness of 1
+	/*imshow("drawcontour", result);
+	waitKey(0);*/
 
 	for (int i = 0; i < rects.size(); i++) {
 
@@ -152,11 +179,15 @@ void initialProcessing(Mat input) {
 			seed.x = rects[i].center.x + rand() % (int)minSize - (minSize / 2);
 			seed.y = rects[i].center.y + rand() % (int)minSize - (minSize / 2);
 			circle(result, seed, 1, Scalar(0, 255, 255), -1);
+			/*imshow("test", result);
+			waitKey(0);*/
 			int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
+			 
 		}
-
-		//imshow("MASK", mask);
-		//waitKey(0);
+/*
+		
+		imshow("MASK", mask);
+		waitKey(0);*/
 
 		//Check new floodfill mask match for a correct patch.
 		//Get all points detected for get Minimal rotated Rect
@@ -169,6 +200,25 @@ void initialProcessing(Mat input) {
 
 		RotatedRect minRect = minAreaRect(pointsInterest);
 
+		cv::Scalar color = cv::Scalar(122.0, 200.0, 255.0); // white
+
+		// We take the edges that OpenCV calculated for us
+		cv::Point2f vertices2f[4];
+		minRect.points(vertices2f);
+
+		// Convert them so we can use them in a fillConvexPoly
+		cv::Point vertices[4];
+		for (int i = 0; i < 4; ++i) {
+			vertices[i] = vertices2f[i];
+		}
+
+		// Now we can fill the rotated rectangle with our specified color
+		cv::fillConvexPoly(input,
+			vertices,
+			4,
+			color);
+		/*imshow("rectangle", input);
+		waitKey(0);*/
 
 
 		if (verifySizes(minRect)) {
@@ -205,6 +255,12 @@ void initialProcessing(Mat input) {
 			grayResult = histeq(grayResult);
 			imshow("result", grayResult);
 			waitKey(0);
+
+			String filename = name;
+
+			stringstream ss(stringstream::in | stringstream::out);
+			ss << "tmp/" << filename << "_" << i << ".jpg";
+			imwrite(ss.str(), grayResult);
 			/*if (saveRegions) {
 				stringstream ss(stringstream::in | stringstream::out);
 				ss << "tmp/" << filename << "_" << i << ".jpg";
@@ -224,20 +280,24 @@ void imgProcessing(Mat input) {
 	Mat edges;
 	const int LAPLACIAN_FILTER_SIZE = 5;
 	Laplacian(gray, edges, CV_8U, LAPLACIAN_FILTER_SIZE);
-
 	Mat mask;
 	const int EDGES_THRESHOLD = 80;
 	threshold(edges, mask, EDGES_THRESHOLD, 255, THRESH_BINARY_INV);
 
-	imshow("test", mask);
-	waitKey(0);
+	/*imshow("test", edges);
+	waitKey(0);*/
 }
 
 int main()
 {	//this is the name of the folder with the photos
 	String pathdir = "data";
 	vector<Mat> input_images = licensePlate(pathdir);
-	initialProcessing(input_images[1]);
+	for (int i = 0; i < input_images.size(); i++) {
+		String name = "gray" + i;
+		initialProcessing(input_images[5], name);
+	}
+	cout << "dioacn" << endl;
+	//imgProcessing(input_images[0]);
 	waitKey(0);
 	return 0;
 }
