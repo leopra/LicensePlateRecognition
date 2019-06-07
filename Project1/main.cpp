@@ -294,7 +294,7 @@ int main()
 	vector<Mat> input_images = licensePlate(pathdir);
 	for (int i = 0; i < input_images.size(); i++) {
 		String name = "gray" + i;
-		initialProcessing(input_images[5], name);
+		initialProcessing(input_images[0], name);
 	}
 	cout << "dioacn" << endl;
 	//imgProcessing(input_images[0]);
