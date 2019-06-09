@@ -14,8 +14,6 @@ from keras.datasets import mnist
 print(X_train.shape)
 # (60000, 28, 28)
 
-from matplotlib import pyplot as plt
-plt.imshow(X_train[0])
 
 #fix error
 #https://stackoverflow.com/questions/41651628/negative-dimension-size-caused-by-subtracting-3-from-1-for-conv2d
@@ -59,3 +57,5 @@ model.fit(X_train, Y_train,
           batch_size=32, nb_epoch=10, verbose=1)
 
 score = model.evaluate(X_test, Y_test, verbose=0)
+
+model.save('first-try.h5')
