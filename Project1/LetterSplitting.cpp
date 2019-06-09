@@ -97,8 +97,8 @@ void characterProcessing(Mat input) {
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
 	cout << "diocan" << endl;
-	imshow("Segmented Chars", result);
-	waitKey(0);
+	/*imshow("Segmented Chars", result);
+	waitKey(0);*/
 
 	//iterate between each contour
 	vector<vector<Point> >::iterator itc = contours.begin();
@@ -112,21 +112,26 @@ void characterProcessing(Mat input) {
 		Rect outputcut = mr;
 
 		Mat outputchar = input(outputcut);
-		imshow("output cut", outputchar);
-		waitKey(0);
+		threshold(outputchar, outputchar, 60, 255, THRESH_BINARY_INV);
+
+		///Resize che char to a 28x28 pixel image to match EMNIST DIMENSIONS
+		Mat resizedchar;
+		resize(outputchar, resizedchar, Size(28, 28));
+		/*imshow("output cut", outputchar);
+		waitKey(0);*/
 		Mat auxRoi(img_threshold, mr);
 		int imagereference = 0;
 		if (verifySizesChar(mr)) {
 			//auxRoi = preprocessChar(auxRoi);
 			//output.push_back(CharSegment(auxRoi, mr));
 			rectangle(result, mr, Scalar(0, 125, 255));
-			imshow("SEgmented Chars", result);
-			waitKey(0);
-			int v1 = rand() % 10000;
-			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\") + std::to_string(v1) + "image.jpg";
+			/*imshow("SEgmented Chars", result);
+			waitKey(0);*/
+			int v1 = rand() % 1000000;
+			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\") + std::to_string(v1) + "char.jpg";
 			cout << filename << endl;
 			try {
-				imwrite(filename, outputchar);
+				imwrite(filename, resizedchar);
 				cout << "done" << endl;
 
 			}

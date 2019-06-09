@@ -6,9 +6,22 @@
 
 
 
+
+
 using namespace std;
 using namespace cv;
 
+//FORWARD DECLARATION (METHODS THAT ARE IN THE OTHER CPP)
+vector<Mat> licensePlateLoad();
+
+void imgProcessing(Mat input);
+
+string type2str(int type);
+
+void characterProcessing(Mat input);
+
+
+//LOAD IMAGES
 vector<Mat> licensePlate(String namefolder)
 {
 	vector<String> fn;
@@ -24,6 +37,7 @@ vector<Mat> licensePlate(String namefolder)
 
 }
 
+//license plate image equalization
 Mat histeq(Mat in)
 {
 	Mat out(in.size(), in.type());
@@ -43,13 +57,10 @@ Mat histeq(Mat in)
 	return out;
 
 }
-//We make basic validations about the regions detected based on its area and aspect ratio.We only
-//consider that a region can be a plate if the aspect ratio is approximately 520 / 110 = 4.727272 (plate
-//	width divided by plate height) with an error margin of 40 percent and an area based on a minimum of
-//	15 pixels and maximum of 125 pixels for the height of the plate.These values are calculated depending
-//	on the image sizes and camera position :
-bool verifySizes(RotatedRect candidate) {
-	float error = 0.4;
+
+//CHECK IF THE RECTANGLE FOUND IS OF THE RIGHT DIMENSIONS
+bool verifySizesContours(RotatedRect candidate) {
+	float error = 0.5; 
 	//Spain car plate size: 52x11 aspect 4,7272
 	const float aspect = 4.7272;
 	//Set a min and max area. All other patches are discarded
@@ -70,7 +81,32 @@ bool verifySizes(RotatedRect candidate) {
 	}
 }
 
-void initialProcessing(Mat input) {
+//CHECK IF THE RECTANGLE FOUND IS OF THE RIGHT DIMENSIONS
+bool verifySizesFloodFill(RotatedRect candidate) {
+	float error = 0.6;
+	//Spain car plate size: 52x11 aspect 4,7272
+	const float aspect = 4.7272;
+	//Set a min and max area. All other patches are discarded
+	int min = 10 * aspect * 10; // minimum area
+	int max = 125 * aspect * 125; // maximum area
+	//Get only patches that match to a respect ratio.
+	float rmin = aspect - aspect * error;
+	float rmax = aspect + aspect * error;
+	int area = candidate.size.height * candidate.size.width;
+	float r = (float)candidate.size.width / (float)candidate.size.height;
+	if (r < 1)
+		r = 1 / r;
+	if ((area < min || area > max) || (r < rmin || r > rmax)) {
+		return false;
+	}
+	else {
+		return true;
+	}
+}
+
+void initialProcessing(Mat input, int i) {
+
+	int imagenumber = i;
 
 	// conversion to gray and blur
 	Mat img_gray;
@@ -88,18 +124,31 @@ void initialProcessing(Mat input) {
 	Mat img_threshold;
 	threshold(img_sobel, img_threshold, 0, 255, THRESH_OTSU + THRESH_BINARY);
 
+	//imshow("threshold", img_threshold);
+	//waitKey(0);
+
 	/*By applying a close morphological operation, we can remove blank spaces between each vertical edge
 		line, and connect all regions that have a high number of edges.In this step we have the possible regions
 		that can contain plates.*/
-	Mat element = getStructuringElement(MORPH_RECT, Size(17, 3));
+	Mat element = getStructuringElement(MORPH_RECT, Size(22, 3)); ///added some pixel here 17->22
 	morphologyEx(img_threshold, img_threshold, MORPH_CLOSE, element);
-
+	cout << type2str(img_threshold.type()) << endl;
 	//Find contours of possibles plates
 	vector< vector< Point> > contours;
 	findContours(img_threshold,
 		contours, // a vector of contours
 		RETR_EXTERNAL, // retrieve the external contours
 		CHAIN_APPROX_NONE); // all pixels of each contour
+
+	///for debugging
+	cv::Mat result;
+	input.copyTo(result);
+	cv::drawContours(result, contours,
+		-1, // draw all contours
+		cv::Scalar(255, 0, 0), // in blue
+		1); // with a thickness of 1
+	imshow("CONTOURS INITIAL", result);
+	waitKey(0);
 
 	//Start to iterate to each contour found
 	vector<vector<Point> >::iterator itc = contours.begin();
@@ -108,7 +157,7 @@ void initialProcessing(Mat input) {
 	while (itc != contours.end()) {
 		//Create bounding rect of object
 		RotatedRect mr = minAreaRect(Mat(*itc));
-		if (!verifySizes(mr)) {
+		if (!verifySizesContours(mr)) {
 			itc = contours.erase(itc);
 		}
 		else {
@@ -118,24 +167,28 @@ void initialProcessing(Mat input) {
 	}
 
 	// Draw blue contours on a white image
-	cv::Mat result;
+	//cv::Mat result;
 	input.copyTo(result);
 	cv::drawContours(result, contours,
 		-1, // draw all contours
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
+	imshow("CONTOURS", result);
+	waitKey(0);
+
+
+	//USING FLOODFILL TO SAVE LESS WRONG LICENSE PATCHES
+	int patchnumber = 0;
 
 	for (int i = 0; i < rects.size(); i++) {
 
-		//For better rect cropping for each posible box
-		//Make floodfill algorithm because the plate has white background
-		//And then we can retrieve more clearly the contour box
-		circle(result, rects[i].center, 3, Scalar(0, 255, 0), -1);
-		//get the min size between width and height
+
+		//circle(result, rects[i].center, 10, Scalar(0, 255, 0), -1);
+		
 		float minSize = (rects[i].size.width < rects[i].size.height) ? rects[i].size.width : rects[i].size.height;
 		minSize = minSize - minSize * 0.5;
 		//initialize rand and get 5 points around center for floodfill algorithm
-		srand(time(NULL));
+		//srand(time(NULL));
 		//Initialize floodfill parameters and variables
 		Mat mask;
 		mask.create(input.rows + 2, input.cols + 2, CV_8UC1);
@@ -144,34 +197,36 @@ void initialProcessing(Mat input) {
 		int upDiff = 30;
 		int connectivity = 4;
 		int newMaskVal = 255;
-		int NumSeeds = 10;
+		int NumSeeds = 5;
 		Rect ccomp;
 		int flags = connectivity + (newMaskVal << 8) + FLOODFILL_FIXED_RANGE + FLOODFILL_MASK_ONLY;
 		for (int j = 0; j < NumSeeds; j++) {
 			Point seed;
 			seed.x = rects[i].center.x + rand() % (int)minSize - (minSize / 2);
 			seed.y = rects[i].center.y + rand() % (int)minSize - (minSize / 2);
-			circle(result, seed, 1, Scalar(0, 255, 255), -1);
-			int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
+		//	circle(result, seed, 1, Scalar(0, 255, 255), -1);
+		int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
 		}
 
-		//imshow("MASK", mask);
-		//waitKey(0);
+		/*imshow("MASK", mask);
+		waitKey(0);*/
 
-		//Check new floodfill mask match for a correct patch.
-		//Get all points detected for get Minimal rotated Rect
+		//Check again if the rectangle has the right dimensions
 		vector<Point> pointsInterest;
 		Mat_<uchar>::iterator itMask = mask.begin<uchar>();
 		Mat_<uchar>::iterator end = mask.end<uchar>();
 		for (; itMask != end; ++itMask)
-			if (*itMask == 255)
+			if (*itMask == 255) //takes the points that the mask rendered white
 				pointsInterest.push_back(itMask.pos());
 
 		RotatedRect minRect = minAreaRect(pointsInterest);
 
+		//RotatedRect minRect = minAreaRect(contours[i]);
 
 
-		if (verifySizes(minRect)) {
+	//CHECK IF RECTANGLE AFTER FLOODFILL IS RIGHT AND THEN CUT THE LICENSE PLATE AND STORE IT IN THE LICENSE PALTES FOLDER
+
+		if (verifySizesFloodFill(minRect)) {
 			// rotated rectangle drawing 
 			Point2f rect_points[4]; minRect.points(rect_points);
 			for (int j = 0; j < 4; j++)
@@ -205,39 +260,45 @@ void initialProcessing(Mat input) {
 			grayResult = histeq(grayResult);
 			imshow("result", grayResult);
 			waitKey(0);
-			/*if (saveRegions) {
-				stringstream ss(stringstream::in | stringstream::out);
-				ss << "tmp/" << filename << "_" << i << ".jpg";
-				imwrite(ss.str(), grayResult);
-			}*/
-			//output.push_back(Plate(grayResult, minRect.boundingRect()));
+			int v1 = rand() % 10000;
+			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\license-plates\\") + std::to_string(imagenumber) + "-" + std::to_string(patchnumber) + "-possiblelicense.jpg";
+			cout << filename << endl;
+			patchnumber++;
+			try {
+				imwrite(filename, grayResult);
+				cout << "done" << endl;
+				
+			}
+			catch (runtime_error& ex) {
+				fprintf(stderr, "exception saving image: %s\n", ex.what());
+				return;
+			}
 		}
 	}
 }
 
-//useless method 
-void imgProcessing(Mat input) {
-	Mat gray;
-	cvtColor(input, gray, COLOR_BGR2GRAY);
-	const int MEDIAN_BLUR_FILTER_SIZE = 7;
-	medianBlur(gray, gray, MEDIAN_BLUR_FILTER_SIZE);
-	Mat edges;
-	const int LAPLACIAN_FILTER_SIZE = 5;
-	Laplacian(gray, edges, CV_8U, LAPLACIAN_FILTER_SIZE);
 
-	Mat mask;
-	const int EDGES_THRESHOLD = 80;
-	threshold(edges, mask, EDGES_THRESHOLD, 255, THRESH_BINARY_INV);
-
-	imshow("test", mask);
-	waitKey(0);
-}
 
 int main()
-{	//this is the name of the folder with the photos
-	String pathdir = "data";
+{	//LOADING PLATES
+	//this is the name of the folder with the photos
+	//String pathdir = "data";
+	/*String pathdir = "eu";
 	vector<Mat> input_images = licensePlate(pathdir);
-	initialProcessing(input_images[1]);
-	waitKey(0);
+	for (int i = 0; i < input_images.size(); i++) {
+		cout << "image : " << i << endl;
+		initialProcessing(input_images[i], i);
+	}*/
+
+	///initialProcessing(input_images[1], 99);
+	///waitKey(0);
+	
+
+	//SPLITTING LETTERS
+	
+	vector<Mat> licenseplates = licensePlateLoad();
+	for (int i = 0; i < licenseplates.size(); i++) {
+	characterProcessing(licenseplates[i]);
+	}
 	return 0;
 }
