@@ -1,11 +1,7 @@
-from __future__ import absolute_import, division, print_function
 
 
-# TensorFlow and tf.keras
 import tensorflow as tf
 from tensorflow import keras
-
-# Helper libraries
 import scipy
 import numpy as np
 import matplotlib.pyplot as plt
@@ -26,12 +22,12 @@ from sklearn.preprocessing import LabelEncoder
 # read data (digits and letters) --> all together
 img_shape = 28 # size of the MNIST images
 temp_train_images, temp_train_labels = loadlocal_mnist(
-        images_path='emnist-byclass-train-images-idx3-ubyte', 
-        labels_path='emnist-byclass-train-labels-idx1-ubyte')
+        images_path='train-class/emnist-byclass-train-images-idx3-ubyte', 
+        labels_path='train-class/emnist-byclass-train-labels-idx1-ubyte')
 
 temp_test_images, temp_test_labels = loadlocal_mnist(
-        images_path='emnist-byclass-test-images-idx3-ubyte', 
-        labels_path='emnist-byclass-test-labels-idx1-ubyte')
+        images_path='train-class/emnist-byclass-test-images-idx3-ubyte', 
+        labels_path='train-class/emnist-byclass-test-labels-idx1-ubyte')
 
 ims = []
 labs = []
@@ -131,6 +127,14 @@ test_images = np.array(ims).reshape((-1, img_shape, img_shape, 1), order="F")
 test_labels = np.array(labs).reshape((-1))
 print(counter)
 
+for image in ims:
+    image_index=i
+    if (temp_train_labels[image_index]==22) :
+        plt.imshow(temp_train_images[image_index].reshape(-1, 28,28, 1),cmap='Greys')
+        plt.show()
+        print(temp_train_labels[image_index])
+    i+=1
+
 #     np.reshape(train_images, (train_labels.shape[0], 28*28))
 print(train_images.shape)
 print('Dimensions: %s' % (train_labels.shape))
@@ -152,25 +156,6 @@ batch_size = 128
 epochs = 6
 #     epochs = 8
 
-# train set
-label_encoder = LabelEncoder()
-integer_encoded = label_encoder.fit_transform(y_train)
-#     print(integer_encoded)
-onehot_encoder = OneHotEncoder(sparse=False)
-integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
-onehot_encoded_train = onehot_encoder.fit_transform(integer_encoded)
-#     print(onehot_encoded_train)
-
-# test set
-label_encoder = LabelEncoder()
-integer_encoded = label_encoder.fit_transform(y_test)
-#     print(integer_encoded)
-
-onehot_encoder = OneHotEncoder(sparse=False)
-integer_encoded = integer_encoded.reshape(len(integer_encoded), 1)
-onehot_encoded_test = onehot_encoder.fit_transform(integer_encoded)
-#     print(onehot_encoded_test)
-
 print("Size of:")
 print("- Training-set:\t\t{}".format(x_train.shape[0]))
 print("- Test-set:\t\t{}".format(x_test.shape[0]))
@@ -180,10 +165,7 @@ num_classes = 33
 class_names = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
                 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J',
                 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T',
-                'U', 'V', 'W', 'X', 'Y', 'Z']#, 'a', 'b', 'c', 'd', 
-#                    'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 
-#                    'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x',
-#                    'y', 'z' ]
+                'U', 'V', 'W', 'X', 'Y', 'Z']
 
 # Data preprocessing: image normalization
 x_train = x_train / 255.0
@@ -196,14 +178,6 @@ x_test = x_test / 255.0
 # Create Keras model and evaluate its performance
 img_rows, img_cols = 28, 28
 
-if K.image_data_format() == "channel_first":
-    x_train = x_train.reshape(x_train_shape[0], 1, img_rows, img_cols)
-    x_test = x_test.reshape(x_test.shape[0], 1, img_rows, img_cols)
-    input_shape = (1, img_rows, img_cols)
-else:
-    x_train = x_train.reshape(x_train.shape[0], img_rows, img_cols, 1)
-    x_test = x_test.reshape(x_test.shape[0], img_rows, img_cols, 1)
-    input_shape = (img_rows, img_cols, 1)
 
 model = Sequential()
 model.add(Conv2D(32, kernel_size=(3, 3),
@@ -226,21 +200,14 @@ history = model.fit(x_train, onehot_encoded_train,
     batch_size=batch_size,
     validation_data=(x_test, onehot_encoded_test))
 score = model.evaluate(x_test, onehot_encoded_test, verbose=1)
-print('Test loss:', score[0])
-print('Test accuracy:', score[1])
+print('loss:', score[0])
+print('accuracy:', score[1])
 
 predictions = model.predict(x_test, verbose=1)
 
-# serialize model to JSON
 model_json = model.to_json()
 with open("model.json", "w") as json_file:
     json_file.write(model_json)
-# serialize weights to HDF5
-model.save_weights("model6_cut.h5")
+model.save_weights("trained-letters.h5")
 print("Saved model to disk")
 
-# fashion utilities
-#plot_example_errors(model, x_test, y_test, class_names)
-#image_with_PDF(x_test, y_test, predictions, num_classes, class_names)
-
-#lot_history([('CNN_classifier', history)])
