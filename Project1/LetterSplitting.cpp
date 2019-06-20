@@ -79,6 +79,30 @@ bool verifySizesChar(Rect candidate) {
 	}
 }
 
+bool verifySizesOfTheLetterIor1(Rect candidate) {
+	float error = 0.2;
+	//character size = 10/2
+	const float aspect = 10 / 2;
+	//Set a min and max area. All other patches are discarded
+	int min = 20; // minimum area
+	int max = 500; // maximum area
+	//Get only patches that match to a respect ratio.
+	float rmin = aspect - aspect * error;
+	float rmax = aspect + aspect * error;
+	int area = candidate.height * candidate.width;
+	cout << area << endl;
+	float r = (float)candidate.width / (float)candidate.height;
+	cout << r << endl;
+	if (r < 1)
+		r = 1 / r;
+	if ((area < min || area > max) || (r < rmin || r > rmax)) {
+		return false;
+	}
+	else {
+		return true;
+	}
+}
+
 void characterProcessing(Mat input, int foldername) {
 
 	Mat img_threshold;
@@ -110,7 +134,7 @@ void characterProcessing(Mat input, int foldername) {
 	path myRoot(namepath);
 	create_directory(myRoot);
 	//iterate between each contour
-	threshold(img_threshold, img_threshold, 60, 255, THRESH_BINARY);
+	//threshold(img_threshold, img_threshold, 60, 255, THRESH_BINARY);
 	imshow("Threshold platex", img_threshold);
 	waitKey(0);
 
@@ -137,6 +161,7 @@ void characterProcessing(Mat input, int foldername) {
 		int left = (int)(percentborder*outputchar.cols); int right = (int)(percentborder*outputchar.cols);*/
 		imshow("output cutss", outputchar);
 		waitKey(0);
+		threshold(outputchar, outputchar, 60, 255, THRESH_BINARY_INV);
 		copyMakeBorder(outputchar, bordered_image, 6, 6, 6, 6, BORDER_ISOLATED, Scalar(255,255,255));
 
 		Mat resizedchar;
@@ -151,7 +176,39 @@ void characterProcessing(Mat input, int foldername) {
 			rectangle(result, mr, Scalar(0, 125, 255));
 			imshow("SEgmented Chars", result);
 			waitKey(0);
+			int erosion_size = 0;
+			Mat element = getStructuringElement(0,
+				Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+				Point(erosion_size, erosion_size));
+
+			/// Apply the erosion operation
+			dilate(resizedchar, resizedchar, element);
+			imshow("Erosion Demo", resizedchar);
 			
+
+			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\") + std::to_string(foldername) + "\\" + to_string(imagereference) + "-char.jpg";
+			cout << filename << endl;
+			try {
+				imwrite(filename, resizedchar);
+				cout << "done" << endl;
+
+			}
+			catch (runtime_error& ex) {
+				fprintf(stderr, "exception saving image: %s\n", ex.what());
+				return;
+			}
+		}
+		else if (verifySizesOfTheLetterIor1) {
+			rectangle(result, mr, Scalar(0, 125, 255));
+			imshow("SEgmented Chars", result);
+			waitKey(0);
+			int erosion_size = 0;
+			Mat element = getStructuringElement(0,
+				Size(2 * erosion_size + 1, 2 * erosion_size + 1),
+				Point(erosion_size, erosion_size));
+			dilate(resizedchar, resizedchar, element);
+			imshow("Erosion Demo", resizedchar);
+
 
 			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\") + std::to_string(foldername) + "\\" + to_string(imagereference) + "-char.jpg";
 			cout << filename << endl;

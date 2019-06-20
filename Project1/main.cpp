@@ -23,6 +23,7 @@ string type2str(int type);
 
 void characterProcessing(Mat input, int foldername);
 
+double LetterMatching(Mat img);
 
 //LOAD IMAGES
 vector<Mat> licensePlate(String namefolder)
@@ -301,10 +302,29 @@ int main()
 //
 //	//SPLITTING LETTERS
 
-	vector<Mat> licenseplates = licensePlateLoad();
+	/*vector<Mat> licenseplates = licensePlateLoad();
 	for (int i = 0; i < licenseplates.size(); i++) {
 	
-	characterProcessing(licenseplates[0], 100);
-	}	
+	characterProcessing(licenseplates[i], i);
+	}*/
+
+
+
+
+	String filename = "E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\100\\";
+	vector<String> fn;
+	glob(filename, fn, false);
+	for (int i = 0; i < fn.size(); i++) {
+		cout << "//////////////////////////////" << endl;
+
+		cout << fn[i] << endl;
+		cout << "//////////////////////////////" << endl;
+
+		Mat imagess = imread(fn[i]);
+		double s = LetterMatching(imagess);
+	}
+
+	waitKey(0);
+
 	return 0;
 }
