@@ -31,10 +31,10 @@ int findMax(vector<int> vec) {
 			temp = vec[i];
 			index = i;
 		}
-		cout << index << endl;
+		cout << temp << endl;
 	}
 
-	if (temp < 5)
+	if (temp < 3)
 		cout << "TARGA NON TROVATA" << endl;
 	else
 		cout << "TARGA TROVATA - CARATTERI SALVATI" << endl;
@@ -51,7 +51,7 @@ vector<Mat> licensePlate(String namefolder)
 
 	for (int i = 0; i < fn.size(); i++) {
 		LicenseVector.push_back(imread(fn[i]));
-		cout << "done" << i << endl;
+		//cout << "done" << i << endl;
 	}
 	return LicenseVector;
 
@@ -85,7 +85,7 @@ bool verifySizesContours(RotatedRect candidate) {
 	//Spain car plate size: 52x11 aspect 4,7272
 	const float aspect = 4.7272;
 	//Set a min and max area. All other patches are discarded
-	int min = 15 * aspect * 15; // minimum area
+	int min = 12 * aspect * 12; // minimum area
 	int max = 125 * aspect * 125; // maximum area
 	//Get only patches that match to a respect ratio.
 	float rmin = aspect - aspect * error;
@@ -149,6 +149,9 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
 
+	imshow("CONTOURS", result);
+	waitKey(0);
+
 	if (DEBUG  == 1) {
 		imshow("CONTOURS INITIAL", result);
 		waitKey(0);
@@ -178,10 +181,9 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
 
-	if (DEBUG == 1) {
-		imshow("CONTOURS", result);
-		waitKey(0);
-	}
+	
+		
+	
 
 	//USING FLOODFILL TO SAVE LESS WRONG LICENSE PATCHES
 	int patchnumber = 0;
@@ -191,12 +193,17 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 	for (int i = 0; i < rects.size(); i++) {
 
 
-		//circle(result, rects[i].center, 10, Scalar(0, 255, 0), -1);
+		circle(result, rects[i].center, 1, Scalar(0, 255, 0), -1);
 		
+		if (DEBUG == 1) {
+			imshow("center", result);
+			waitKey(0);
+		}
+
+		//the smallest dimension is choosen so that the point is inside the contour in almost every case
 		float minSize = (rects[i].size.width < rects[i].size.height) ? rects[i].size.width : rects[i].size.height;
-		minSize = minSize - minSize * 0.5;
 		//initialize rand and get 5 points around center for floodfill algorithm
-		//srand(time(NULL));
+		srand(time(NULL));
 		//Initialize floodfill parameters and variables
 		Mat mask;
 		mask.create(input.rows + 2, input.cols + 2, CV_8UC1);
@@ -205,22 +212,38 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 		int upDiff = 30;
 		int connectivity = 4;
 		int newMaskVal = 255;
-		int NumSeeds = 5;
+		int NumSeeds = 10;
 		Rect ccomp;
 		int flags = connectivity + (newMaskVal << 8) + FLOODFILL_FIXED_RANGE + FLOODFILL_MASK_ONLY;
 		for (int j = 0; j < NumSeeds; j++) {
 			Point seed;
 			seed.x = rects[i].center.x + rand() % (int)minSize - (minSize / 2);
 			seed.y = rects[i].center.y + rand() % (int)minSize - (minSize / 2);
-		//	circle(result, seed, 1, Scalar(0, 255, 255), -1);
-		int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
+			circle(result, seed, 1, Scalar(0, 0, 255), -1);
+			/*if (DEBUG == 1) {
+				imshow("center", result);
+				waitKey(0);
+			}*/
+			//Vec3f color = input.at<Vec3f>(Point(seed.x, seed.y));
+			//if (color[0] < 100 && color[1] < 100 && color[2] < 100) {
+			//	//cout << "skip" << endl;
+			//	//do nothing
+			//	}
+			//else {
+				int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
+				/*if (DEBUG == 1) {
+					imshow("MASK", mask);
+					waitKey(0);
+				}*/
+			//}
 		}
 
-		if (DEBUG == 1) {
+		if (DEBUG == 0) {
 			imshow("MASK", mask);
 			waitKey(0);
 		}
 
+		
 		//Check again if the rectangle has the right dimensions
 		vector<Point> pointsInterest;
 		Mat_<uchar>::iterator itMask = mask.begin<uchar>();
@@ -229,8 +252,9 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 			if (*itMask == 255) //takes the points that the mask rendered white
 				pointsInterest.push_back(itMask.pos());
 
-		RotatedRect minRect = minAreaRect(pointsInterest);
-
+		if (pointsInterest.size() != 0) {
+			RotatedRect minRect = minAreaRect(pointsInterest);
+		
 		//RotatedRect minRect = minAreaRect(contours[i]);
 
 
@@ -289,6 +313,7 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 			}
 		}
 	}
+		}
 	return possiblePlates;
 }
 
@@ -297,28 +322,31 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 int main()
 
 {
+	srand(time(NULL));
+
 	//possible parameters to change
 	/////////////////////////////// 
 	int DEBUG = 0;
 
-	int IMAGE_NUMBER = 0;
+	int IMAGE_NUMBER = rand () % 6;
 
 	String pathdir = "data";
 
 	///////////////////////////////
 
-	vector<Mat> Licenses;
-
 	vector<Mat> input_images = licensePlate(pathdir);
 
-	Licenses = initialProcessing(input_images[IMAGE_NUMBER], IMAGE_NUMBER, DEBUG);
-
+	vector<Mat> Licenses = initialProcessing(input_images[IMAGE_NUMBER], IMAGE_NUMBER, DEBUG);
+	if (Licenses.empty()) {
+		imshow("FALLITO", input_images[IMAGE_NUMBER]);
+		waitKey(0);
+		return 0;
+	}
 
 	vector<int> char_found;
-	vector<Mat> licenseplates = licensePlateLoad();
-	for (int i = 0; i < licenseplates.size(); i++) {
+	for (int i = 0; i < Licenses.size(); i++) {
 
-		char_found.push_back(characterProcessing(licenseplates[i], i, DEBUG));
+		char_found.push_back(characterProcessing(Licenses[i], i, DEBUG));
 
 	}
 	int index = findMax(char_found);

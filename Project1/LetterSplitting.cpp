@@ -113,9 +113,15 @@ bool verifySizesChar(Rect candidate) {
 int characterProcessing(Mat input, int foldername, int DEBUG) {
 
 	Mat img_threshold;
-	cvtColor(input, img_threshold, COLOR_BGR2GRAY);
 
-	threshold(img_threshold, img_threshold, 60, 255, THRESH_BINARY_INV);
+	if (DEBUG == 1) {
+		imshow("image", input);
+		waitKey(0);
+	}
+	//remember to change this if image loaded from pc
+	//cvtColor(input, img_threshold, COLOR_BGR2GRAY);
+
+	threshold(input, img_threshold, 60, 255, THRESH_BINARY_INV);
 
 	if (DEBUG == 1) {
 		imshow("Threshold plate", img_threshold);
@@ -128,7 +134,7 @@ int characterProcessing(Mat input, int foldername, int DEBUG) {
 	vector< vector< Point> > contours;
 	findContours(img_threshold, contours, RETR_EXTERNAL, CHAIN_APPROX_NONE);
 	cv::Mat result;
-	img_threshold.copyTo(result);
+	input.copyTo(result);
 	cv::drawContours(result, contours,
 		-1, // draw all contours
 		cv::Scalar(255, 0, 0), // in blue
@@ -177,10 +183,7 @@ int characterProcessing(Mat input, int foldername, int DEBUG) {
 		/*int top = (int)(percentborder*outputchar.rows); int bottom = (int)(percentborder*outputchar.rows);
 		int left = (int)(percentborder*outputchar.cols); int right = (int)(percentborder*outputchar.cols);*/
 
-		if (DEBUG == 1) {
-			imshow("output cutss", outputchar);
-			waitKey(0);
-		}
+		
 		threshold(outputchar, outputchar, 60, 255, THRESH_BINARY_INV);
 		copyMakeBorder(outputchar, bordered_image, 6, 6, 6, 6, BORDER_ISOLATED, Scalar(255,255,255));
 
@@ -200,6 +203,12 @@ int characterProcessing(Mat input, int foldername, int DEBUG) {
 				imshow("SEgmented Chars", result);
 				waitKey(0);
 			}
+
+			if (DEBUG == 1) {
+				imshow("output cutss", outputchar);
+				waitKey(0);
+			}
+
 			int erosion_size = 0;
 			Mat element = getStructuringElement(0,
 				Size(2 * erosion_size + 1, 2 * erosion_size + 1),
