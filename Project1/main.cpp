@@ -7,10 +7,6 @@
 
 
 using namespace std::experimental::filesystem::v1;
-
-
-
-
 using namespace std;
 using namespace cv;
 
@@ -21,10 +17,31 @@ void imgProcessing(Mat input);
 
 string type2str(int type);
 
-void characterProcessing(Mat input, int foldername);
+int characterProcessing(Mat input, int foldername, int DEBUG);
 
 double LetterMatching(Mat img);
+////////////////////////////////////////////////////////
 
+//FIND MAX METHOD
+int findMax(vector<int> vec) {
+	int temp = 0;
+	int index = 0;
+	for (int i = 0; i < vec.size(); i++) {
+		if (temp < vec[i]) {
+			temp = vec[i];
+			index = i;
+		}
+		cout << index << endl;
+	}
+
+	if (temp < 5)
+		cout << "TARGA NON TROVATA" << endl;
+	else
+		cout << "TARGA TROVATA - CARATTERI SALVATI" << endl;
+
+	return index;
+
+}
 //LOAD IMAGES
 vector<Mat> licensePlate(String namefolder)
 {
@@ -64,7 +81,7 @@ Mat equalizeHist(Mat in)
 
 //CHECK IF THE RECTANGLE FOUND IS OF THE RIGHT DIMENSIONS
 bool verifySizesContours(RotatedRect candidate) {
-	float error = 0.5; 
+	float error = 0.4; 
 	//Spain car plate size: 52x11 aspect 4,7272
 	const float aspect = 4.7272;
 	//Set a min and max area. All other patches are discarded
@@ -85,30 +102,8 @@ bool verifySizesContours(RotatedRect candidate) {
 	}
 }
 
-//CHECK IF THE RECTANGLE FOUND IS OF THE RIGHT DIMENSIONS
-bool verifySizesFloodFill(RotatedRect candidate) {
-	float error = 0.6;
-	//Spain car plate size: 52x11 aspect 4,7272
-	const float aspect = 4.7272;
-	//Set a min and max area. All other patches are discarded
-	int min = 10 * aspect * 10; // minimum area
-	int max = 125 * aspect * 125; // maximum area
-	//Get only patches that match to a respect ratio.
-	float rmin = aspect - aspect * error;
-	float rmax = aspect + aspect * error;
-	int area = candidate.size.height * candidate.size.width;
-	float r = (float)candidate.size.width / (float)candidate.size.height;
-	if (r < 1)
-		r = 1 / r;
-	if ((area < min || area > max) || (r < rmin || r > rmax)) {
-		return false;
-	}
-	else {
-		return true;
-	}
-}
 
-void initialProcessing(Mat input, int foldername) {
+vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 
 	//create a folder for che carachters to be saved
 	String namepath = string("char-found/" + to_string(foldername));
@@ -116,7 +111,6 @@ void initialProcessing(Mat input, int foldername) {
 	path myRoot(namepath);
 	create_directory(myRoot);
 	int imagenumber = foldername;
-	cout << "what" << endl;
 	// conversion to gray and blur
 	Mat img_gray;
 	cvtColor(input, img_gray, COLOR_BGR2GRAY);
@@ -131,9 +125,10 @@ void initialProcessing(Mat input, int foldername) {
 	Mat img_threshold;
 	threshold(img_sobel, img_threshold, 0, 255, THRESH_OTSU + THRESH_BINARY);
 
-	//imshow("threshold", img_threshold);
-	//waitKey(0);
-
+	if (DEBUG == 1) {
+		imshow("threshold", img_threshold);
+		waitKey(0);
+	}
 	//By applying a close morphological operation, we can remove blank spaces between each vertical edge
 		
 	Mat element = getStructuringElement(MORPH_RECT, Size(22, 3)); ///added some pixel here 17->22
@@ -153,8 +148,11 @@ void initialProcessing(Mat input, int foldername) {
 		-1, // draw all contours
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
-	imshow("CONTOURS INITIAL", result);
-	waitKey(0);
+
+	if (DEBUG  == 1) {
+		imshow("CONTOURS INITIAL", result);
+		waitKey(0);
+	}
 
 	//Start to iterate to each contour found
 	vector<vector<Point> >::iterator itc = contours.begin();
@@ -179,12 +177,16 @@ void initialProcessing(Mat input, int foldername) {
 		-1, // draw all contours
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
-	imshow("CONTOURS", result);
-	waitKey(0);
 
+	if (DEBUG == 1) {
+		imshow("CONTOURS", result);
+		waitKey(0);
+	}
 
 	//USING FLOODFILL TO SAVE LESS WRONG LICENSE PATCHES
 	int patchnumber = 0;
+
+	vector<Mat> possiblePlates;
 
 	for (int i = 0; i < rects.size(); i++) {
 
@@ -214,8 +216,10 @@ void initialProcessing(Mat input, int foldername) {
 		int area = floodFill(input, mask, seed, Scalar(255, 0, 0), &ccomp, Scalar(loDiff, loDiff, loDiff), Scalar(upDiff, upDiff, upDiff), flags);
 		}
 
-		imshow("MASK", mask);
-		waitKey(0);
+		if (DEBUG == 1) {
+			imshow("MASK", mask);
+			waitKey(0);
+		}
 
 		//Check again if the rectangle has the right dimensions
 		vector<Point> pointsInterest;
@@ -232,7 +236,7 @@ void initialProcessing(Mat input, int foldername) {
 
 	//CHECK IF RECTANGLE AFTER FLOODFILL IS RIGHT AND THEN CUT THE LICENSE PLATE AND STORE IT IN THE LICENSE PALTES FOLDER
 
-		if (verifySizesFloodFill(minRect)) {
+		if (verifySizesContours(minRect)) {
 			// rotated rectangle drawing 
 			Point2f rect_points[4]; minRect.points(rect_points);
 			for (int j = 0; j < 4; j++)
@@ -264,9 +268,13 @@ void initialProcessing(Mat input, int foldername) {
 			cvtColor(resultResized, grayResult, COLOR_BGR2GRAY);
 			blur(grayResult, grayResult, Size(3, 3));
 			grayResult = equalizeHist(grayResult);
-			imshow("result", grayResult);
-			waitKey(0);
-			int v1 = rand() % 10000;
+
+			if (DEBUG == 1) {
+				imshow("result", grayResult);
+				waitKey(0);
+			}
+			possiblePlates.push_back(grayResult);
+
 			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\license-plates\\") + std::to_string(imagenumber) + "-" + std::to_string(patchnumber) + "-possiblelicense.jpg";
 			cout << filename << endl;
 			patchnumber++;
@@ -277,54 +285,47 @@ void initialProcessing(Mat input, int foldername) {
 			}
 			catch (runtime_error& ex) {
 				fprintf(stderr, "exception saving image: %s\n", ex.what());
-				return;
+				return possiblePlates;
 			}
 		}
 	}
+	return possiblePlates;
 }
 
 
 
 int main()
-{	//LOADING PLATES
-//	//this is the name of the folder with the photos
-//	String pathdir = "data";
-//	//String pathdir = "eu";
-//	vector<Mat> input_images = licensePlate(pathdir);
-//	//for (int i = 0; i < input_images.size(); i++) {
-//	//	cout << "image : " << i << endl;
-//	//	initialProcessing(input_images[i], i);
-//	//}
-//
-//	initialProcessing(input_images[0], 99);
-//	//waitKey(0);
-//
-//
-//	//SPLITTING LETTERS
 
-	/*vector<Mat> licenseplates = licensePlateLoad();
+{
+	//possible parameters to change
+	/////////////////////////////// 
+	int DEBUG = 0;
+
+	int IMAGE_NUMBER = 0;
+
+	String pathdir = "data";
+
+	///////////////////////////////
+
+	vector<Mat> Licenses;
+
+	vector<Mat> input_images = licensePlate(pathdir);
+
+	Licenses = initialProcessing(input_images[IMAGE_NUMBER], IMAGE_NUMBER, DEBUG);
+
+
+	vector<int> char_found;
+	vector<Mat> licenseplates = licensePlateLoad();
 	for (int i = 0; i < licenseplates.size(); i++) {
-	
-	characterProcessing(licenseplates[i], i);
-	}*/
 
+		char_found.push_back(characterProcessing(licenseplates[i], i, DEBUG));
 
-
-
-	String filename = "E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\100\\";
-	vector<String> fn;
-	glob(filename, fn, false);
-	for (int i = 0; i < fn.size(); i++) {
-		cout << "//////////////////////////////" << endl;
-
-		cout << fn[i] << endl;
-		cout << "//////////////////////////////" << endl;
-
-		Mat imagess = imread(fn[i]);
-		double s = LetterMatching(imagess);
 	}
-
+	int index = findMax(char_found);
+	cout << "END" << endl;
+	imshow("END", Licenses[index]);
+	
 	waitKey(0);
-
+	
 	return 0;
 }

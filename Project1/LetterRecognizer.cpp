@@ -75,3 +75,21 @@ double LetterMatching(Mat img) {
 	cout << "FINAL PREDICTION: " << lettername << endl;
 	return temp;
 }
+
+
+//main
+
+//String filename = "E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\100\\";
+//vector<String> fn;
+//glob(filename, fn, false);
+//for (int i = 0; i < fn.size(); i++) {
+//	cout << "//////////////////////////////" << endl;
+//
+//	cout << fn[i] << endl;
+//	cout << "//////////////////////////////" << endl;
+//
+//	Mat imagess = imread(fn[i]);
+//	double s = LetterMatching(imagess);
+//}
+//
+//waitKey(0);

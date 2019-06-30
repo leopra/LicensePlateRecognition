@@ -18,7 +18,9 @@ vector<Mat> licensePlateLoad()
 {
 	vector<String> fn;
 	vector<Mat> LicenseVector;
-	glob("license-plates/*.jpg", fn, false);
+	//glob("license-plates/*.jpg", fn, false);
+	glob("char-found/*.jpg", fn, false);
+
 
 	for (int i = 0; i < fn.size(); i++) {
 		LicenseVector.push_back(imread(fn[i]));
@@ -66,9 +68,14 @@ bool verifySizesChar(Rect candidate) {
 	float rmin = aspect - aspect * error;
 	float rmax = aspect + aspect * error;
 	int area = candidate.height * candidate.width;
-	cout << area << endl;
+
+	
 	float r = (float)candidate.width / (float)candidate.height;
-	cout << r << endl;
+
+
+		//cout << area << endl;
+		//cout << r << endl;
+
 	if (r < 1)
 		r = 1 / r;
 	if ((area < min || area > max) || (r < rmin || r > rmax)) {
@@ -79,40 +86,42 @@ bool verifySizesChar(Rect candidate) {
 	}
 }
 
-bool verifySizesOfTheLetterIor1(Rect candidate) {
-	float error = 0.2;
-	//character size = 10/2
-	const float aspect = 10 / 2;
-	//Set a min and max area. All other patches are discarded
-	int min = 20; // minimum area
-	int max = 500; // maximum area
-	//Get only patches that match to a respect ratio.
-	float rmin = aspect - aspect * error;
-	float rmax = aspect + aspect * error;
-	int area = candidate.height * candidate.width;
-	cout << area << endl;
-	float r = (float)candidate.width / (float)candidate.height;
-	cout << r << endl;
-	if (r < 1)
-		r = 1 / r;
-	if ((area < min || area > max) || (r < rmin || r > rmax)) {
-		return false;
-	}
-	else {
-		return true;
-	}
-}
+//bool verifySizesOfTheLetterIor1(Rect candidate) {
+//	float error = 0.2;
+//	//character size = 10/2
+//	const float aspect = 10 / 2;
+//	//Set a min and max area. All other patches are discarded
+//	int min = 20; // minimum area
+//	int max = 500; // maximum area
+//	//Get only patches that match to a respect ratio.
+//	float rmin = aspect - aspect * error;
+//	float rmax = aspect + aspect * error;
+//	int area = candidate.height * candidate.width;
+//	cout << area << endl;
+//	float r = (float)candidate.width / (float)candidate.height;
+//	cout << r << endl;
+//	if (r < 1)
+//		r = 1 / r;
+//	if ((area < min || area > max) || (r < rmin || r > rmax)) {
+//		return false;
+//	}
+//	else {
+//		return true;
+//	}
+//}
 
-void characterProcessing(Mat input, int foldername) {
+int characterProcessing(Mat input, int foldername, int DEBUG) {
 
 	Mat img_threshold;
 	cvtColor(input, img_threshold, COLOR_BGR2GRAY);
 
 	threshold(img_threshold, img_threshold, 60, 255, THRESH_BINARY_INV);
-	imshow("Threshold plate", img_threshold);
-	waitKey(0);
-	cout << type2str(img_threshold.type()) << endl;
 
+	if (DEBUG == 1) {
+		imshow("Threshold plate", img_threshold);
+		waitKey(0);
+		cout << type2str(img_threshold.type()) << endl;
+	}
 	Mat img_contours;
 	img_threshold.copyTo(img_contours);
 	Mat dst;
@@ -125,8 +134,12 @@ void characterProcessing(Mat input, int foldername) {
 		cv::Scalar(255, 0, 0), // in blue
 		1); // with a thickness of 1
 	cout << "finish" << endl;
-	imshow("Segmented Chars", result);
-	waitKey(0);
+
+	if (DEBUG == 1) {
+		imshow("Segmented Chars", result);
+		waitKey(0);
+	}
+
 	int imagereference = 0;
 
 	String namepath = string("char-found/" + to_string(foldername));
@@ -135,10 +148,14 @@ void characterProcessing(Mat input, int foldername) {
 	create_directory(myRoot);
 	//iterate between each contour
 	//threshold(img_threshold, img_threshold, 60, 255, THRESH_BINARY);
-	imshow("Threshold platex", img_threshold);
-	waitKey(0);
 
+	if (DEBUG == 1) {
+		imshow("Threshold platex", img_threshold);
+		waitKey(0);
+	}
 	vector<vector<Point> >::iterator itc = contours.begin();
+
+	int numberOfChar = 0;
 	while (itc != contours.end()) {
 
 		//Create bounding rect of object
@@ -159,8 +176,11 @@ void characterProcessing(Mat input, int foldername) {
 
 		/*int top = (int)(percentborder*outputchar.rows); int bottom = (int)(percentborder*outputchar.rows);
 		int left = (int)(percentborder*outputchar.cols); int right = (int)(percentborder*outputchar.cols);*/
-		imshow("output cutss", outputchar);
-		waitKey(0);
+
+		if (DEBUG == 1) {
+			imshow("output cutss", outputchar);
+			waitKey(0);
+		}
 		threshold(outputchar, outputchar, 60, 255, THRESH_BINARY_INV);
 		copyMakeBorder(outputchar, bordered_image, 6, 6, 6, 6, BORDER_ISOLATED, Scalar(255,255,255));
 
@@ -171,11 +191,15 @@ void characterProcessing(Mat input, int foldername) {
 		waitKey(0);*/
 		Mat auxRoi(img_threshold, mr);
 		if (verifySizesChar(mr)) {
+			numberOfChar++;
 			//auxRoi = preprocessChar(auxRoi);
 			//output.push_back(CharSegment(auxRoi, mr));
 			rectangle(result, mr, Scalar(0, 125, 255));
-			imshow("SEgmented Chars", result);
-			waitKey(0);
+
+			if (DEBUG == 1) {
+				imshow("SEgmented Chars", result);
+				waitKey(0);
+			}
 			int erosion_size = 0;
 			Mat element = getStructuringElement(0,
 				Size(2 * erosion_size + 1, 2 * erosion_size + 1),
@@ -183,22 +207,26 @@ void characterProcessing(Mat input, int foldername) {
 
 			/// Apply the erosion operation
 			dilate(resizedchar, resizedchar, element);
-			imshow("Erosion Demo", resizedchar);
+
+			//imshow("Erosion Demo", resizedchar);
 			
 
 			string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\char-found\\") + std::to_string(foldername) + "\\" + to_string(imagereference) + "-char.jpg";
-			cout << filename << endl;
+
+			if (DEBUG == 1) {
+				cout << filename << endl;
+			}
 			try {
 				imwrite(filename, resizedchar);
-				cout << "done" << endl;
+				cout << "char writtend in folder" << endl;
 
 			}
 			catch (runtime_error& ex) {
 				fprintf(stderr, "exception saving image: %s\n", ex.what());
-				return;
+				return -1;
 			}
 		}
-		else if (verifySizesOfTheLetterIor1) {
+		/*else if (verifySizesOfTheLetterIor1) {
 			rectangle(result, mr, Scalar(0, 125, 255));
 			imshow("SEgmented Chars", result);
 			waitKey(0);
@@ -221,10 +249,11 @@ void characterProcessing(Mat input, int foldername) {
 				fprintf(stderr, "exception saving image: %s\n", ex.what());
 				return;
 			}
-		}
+		}*/
 		imagereference++;
 		++itc;
 	}
+	return numberOfChar;
 }
 //useless method 
 void imgProcessing(Mat input) {
