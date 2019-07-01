@@ -24,12 +24,12 @@
     <ClCompile Include="LetterRecognizer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="PossibleChar.cpp">
+    <ClCompile Include="Char.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PossibleChar.h">
+    <ClInclude Include="Char.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

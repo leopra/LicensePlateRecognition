@@ -123,10 +123,10 @@
     <ClCompile Include="LetterSplitting.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="LetterRecognizer.cpp" />
-    <ClCompile Include="PossibleChar.cpp" />
+    <ClCompile Include="Char.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PossibleChar.h" />
+    <ClInclude Include="Char.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

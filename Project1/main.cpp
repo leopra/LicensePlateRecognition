@@ -4,9 +4,9 @@
 #include <opencv2/imgproc.hpp>
 #include <vector>
 #include <filesystem>
-#include "PossibleChar.h"
+#include "Char.h"
 
-using namespace std::experimental::filesystem::v1;
+//using namespace experimental::filesystem::v1;
 using namespace std;
 using namespace cv;
 
@@ -21,33 +21,7 @@ int characterProcessing(Mat input, int foldername, int DEBUG);
 
 double LetterMatching(Mat img);
 ////////////////////////////////////////////////////////
-const int MIN_PIXEL_WIDTH = 2;
-const int MIN_PIXEL_HEIGHT = 8;
 
-const double MIN_ASPECT_RATIO = 0.25;
-const double MAX_ASPECT_RATIO = 1.0;
-
-const int MIN_PIXEL_AREA = 80;
-
-// constants for comparing two chars
-const double MIN_DIAG_SIZE_MULTIPLE_AWAY = 0.3;
-const double MAX_DIAG_SIZE_MULTIPLE_AWAY = 5.0;
-
-const double MAX_CHANGE_IN_AREA = 0.5;
-
-const double MAX_CHANGE_IN_WIDTH = 0.8;
-const double MAX_CHANGE_IN_HEIGHT = 0.2;
-
-const double MAX_ANGLE_BETWEEN_CHARS = 12.0;
-
-// other constants
-const int MIN_NUMBER_OF_MATCHING_CHARS = 3;
-
-const int RESIZED_CHAR_IMAGE_WIDTH = 20;
-const int RESIZED_CHAR_IMAGE_HEIGHT = 30;
-
-const int MIN_CONTOUR_AREA = 100;
-//////////////////////////////////////////////////////
 //FIND MAX METHOD
 int findMax(vector<int> vec) {
 	int temp = 0;
@@ -105,8 +79,8 @@ Mat equalizeHist(Mat in)
 
 }
 
-// use Pythagorean theorem to calculate distance between two chars
-double distanceBetweenChars(const PossibleChar &firstChar, const PossibleChar &secondChar) {
+// use Pitagora to calculate distance between two chars
+double distanceBetweenChars(Char firstChar, Char secondChar) {
 	int intX = abs(firstChar.intCenterX - secondChar.intCenterX);
 	int intY = abs(firstChar.intCenterY - secondChar.intCenterY);
 
@@ -115,12 +89,12 @@ double distanceBetweenChars(const PossibleChar &firstChar, const PossibleChar &s
 
 //CHECK IF THE RECTANGLE FOUND IS OF THE RIGHT DIMENSIONS
 bool verifySizesContours(RotatedRect candidate) {
-	float error = 0.4; 
+	float error = 0.2; 
 	//Spain car plate size: 52x11 aspect 4,7272
 	const float aspect = 4.7272;
 	//Set a min and max area. All other patches are discarded
-	int min = 12 * aspect * 12; // minimum area
-	int max = 125 * aspect * 125; // maximum area
+	int min = 1500; // minimum area
+	int max = 6000; // maximum area
 	//Get only patches that match to a respect ratio.
 	float rmin = aspect - aspect * error;
 	float rmax = aspect + aspect * error;
@@ -135,38 +109,40 @@ bool verifySizesContours(RotatedRect candidate) {
 		return true;
 	}
 }
-bool checkIfPossibleChar(PossibleChar &possibleChar) {
-	// this function is a 'first pass' that does a rough check on a contour to see if it could be a char,
-	// note that we are not (yet) comparing the char to other chars to look for a group
-	if (possibleChar.boundingRect.area() > MIN_PIXEL_AREA &&
-		possibleChar.boundingRect.width > MIN_PIXEL_WIDTH && possibleChar.boundingRect.height > MIN_PIXEL_HEIGHT &&
-		MIN_ASPECT_RATIO < possibleChar.dblAspectRatio && possibleChar.dblAspectRatio < MAX_ASPECT_RATIO) {
-		return(true);
+
+// check if sizes correspond
+bool checkIfPossibleChar(Char &possibleChar) {
+	if (possibleChar.boundingRect.area() > 80 &&
+		possibleChar.boundingRect.width > 2 && possibleChar.boundingRect.height > 8 &&
+		0.25 < possibleChar.Ratio && possibleChar.Ratio < 1) {
+		return true;
 	}
 	else {
-		return(false);
+		return false;
 	}
 }
-std::vector<PossibleChar> findPossibleCharsInScene( Mat &imgThresh) {
-	std::vector<PossibleChar> vectorOfPossibleChars;            // this will be the return value
+
+// search for chars
+vector<Char> searchAlltheChars( Mat imgThresh) {
+	vector<Char> vectorOfPossibleChars;            // this will be the return value
 
 	Mat imgContours(imgThresh.size(), CV_8UC3, Scalar(0,0,0));
 	int intCountOfPossibleChars = 0;
 
 	 Mat imgThreshCopy = imgThresh.clone();
 
-	std::vector<std::vector< Point> > contours;
+	vector<vector< Point> > contours;
 
 	 findContours(imgThreshCopy, contours, RETR_LIST, CHAIN_APPROX_SIMPLE);        // find all contours
 
 	for ( int i = 0; i < contours.size(); i++) {                // for each contour
 
 		 drawContours(imgContours, contours, i, Scalar(255, 255, 255));
-		PossibleChar possibleChar(contours[i]);
+		Char possibleChar(contours[i]);
 
-		if (checkIfPossibleChar(possibleChar)) {                // if contour is a possible char, note this does not compare to other chars (yet) . . .
-			intCountOfPossibleChars++;                          // increment count of possible chars
-			vectorOfPossibleChars.push_back(possibleChar);      // and add to vector of possible chars
+		if (checkIfPossibleChar(possibleChar)) {               
+			intCountOfPossibleChars++;                          
+			vectorOfPossibleChars.push_back(possibleChar);    
 		}
 	}
 
@@ -175,54 +151,51 @@ std::vector<PossibleChar> findPossibleCharsInScene( Mat &imgThresh) {
 		waitKey(0);
 	
 
-	return(vectorOfPossibleChars);
+	return vectorOfPossibleChars;
 }
 
- Mat extractValue( Mat &imgOriginal) {
-	 Mat imgHSV;
-	std::vector< Mat> vectorOfHSVImages;
-	 Mat imgValue;
+double angleof2Chars(Char firstChar, Char secondChar) {
+	double modX = abs(firstChar.intCenterX - secondChar.intCenterX);
+	double modY = abs(firstChar.intCenterY - secondChar.intCenterY);
 
-	 cvtColor(imgOriginal, imgHSV, COLOR_BGR2HSV);
+	double radAngle = atan(modY / modX);
 
-	 split(imgHSV, vectorOfHSVImages);
-
-	imgValue = vectorOfHSVImages[2];
-
-	return(imgValue);
+	return radAngle;
 }
 
-std::vector<PossibleChar> findVectorOfMatchingChars(const PossibleChar &possibleChar, const std::vector<PossibleChar> &vectorOfChars) {
-	// the purpose of this function is, given a possible char and a big vector of possible chars,
-	// find all chars in the big vector that are a match for the single possible char, and return those matching chars as a vector
-	std::vector<PossibleChar> vectorOfMatchingChars;                // this will be the return value
+//search one char for a match in all chars
+vector<Char> findVectorOfMatchingChars(Char possibleChar, vector<Char> vectorOfChars) {
+	// find all chars in the big vector that are a match for the single possible char
+	vector<Char> vectorOfMatchingChars;                
+	for (int i = 0; i < vectorOfChars.size(); i++) {
+		Char possibleMatchingChar = vectorOfChars[i];
+         // for each char in big vector
 
-	for (auto &possibleMatchingChar : vectorOfChars) {              // for each char in big vector
-
-																	// if the char we attempting to find matches for is the exact same char as the char in the big vector we are currently checking
-		if (possibleMatchingChar == possibleChar) {
-			// then we should not include it in the vector of matches b/c that would end up double including the current char
-			continue;           // so do not add to vector of matches and jump back to top of for loop
-		}
-		// compute stuff to see if chars are a match
+			
+		// I calculate the difference between parameters of Char Class
+		double diffAngle = angleof2Chars(possibleChar, possibleMatchingChar);
 		double dblDistanceBetweenChars = distanceBetweenChars(possibleChar, possibleMatchingChar);
-		double dblChangeInArea = (double)abs(possibleMatchingChar.boundingRect.area() - possibleChar.boundingRect.area()) / (double)possibleChar.boundingRect.area();
-		double dblChangeInWidth = (double)abs(possibleMatchingChar.boundingRect.width - possibleChar.boundingRect.width) / (double)possibleChar.boundingRect.width;
-		double dblChangeInHeight = (double)abs(possibleMatchingChar.boundingRect.height - possibleChar.boundingRect.height) / (double)possibleChar.boundingRect.height;
+		double DiffArea = (double)abs(possibleMatchingChar.boundingRect.area() - possibleChar.boundingRect.area()) / (double)possibleChar.boundingRect.area();
+		double DiffWidth = (double)abs(possibleMatchingChar.boundingRect.width - possibleChar.boundingRect.width) / (double)possibleChar.boundingRect.width;
+		double DiffAlt = (double)abs(possibleMatchingChar.boundingRect.height - possibleChar.boundingRect.height) / (double)possibleChar.boundingRect.height;
 
-		// check if chars match
-		if (dblDistanceBetweenChars < (possibleChar.dblDiagonalSize * MAX_DIAG_SIZE_MULTIPLE_AWAY) &&
-			dblChangeInArea < MAX_CHANGE_IN_AREA &&
-			dblChangeInWidth < MAX_CHANGE_IN_WIDTH &&
-			dblChangeInHeight < MAX_CHANGE_IN_HEIGHT) {
-			vectorOfMatchingChars.push_back(possibleMatchingChar);      // if the chars are a match, add the current char to vector of matching chars
+		// then I compare it with some thresholds
+		if (dblDistanceBetweenChars < (possibleChar.dblDiagonalSize * 5) &&
+			DiffArea < 0.5 &&
+			DiffWidth < 0.8 &&
+			DiffAlt < 0.2 
+			&& diffAngle < 38
+			) {
+			vectorOfMatchingChars.push_back(possibleMatchingChar);     
 		}
 	}
 
-	return(vectorOfMatchingChars);          // return result
+	return(vectorOfMatchingChars); 
 }
 
- Mat maximizeContrast( Mat &imgGrayscale) {
+// using top hat black hat operator to get best contrast
+//enhance dark objects of interest in a bright background
+ Mat enhanceBlackOnWhite( Mat imgGrayscale) {
 	 Mat imgTopHat;
 	 Mat imgBlackHat;
 	 Mat imgGrayscalePlusTopHat;
@@ -239,77 +212,71 @@ std::vector<PossibleChar> findVectorOfMatchingChars(const PossibleChar &possible
 	return(imgGrayscalePlusTopHatMinusBlackHat);
 }
 
-std::vector<std::vector<PossibleChar> > findVectorOfVectorsOfMatchingChars(const std::vector<PossibleChar> &vectorOfPossibleChars) {
-	// with this function, we start off with all the possible chars in one big vector
-	// the purpose of this function is to re-arrange the one big vector of chars into a vector of vectors of matching chars,
-	// note that chars that are not found to be in a group of matches do not need to be considered further
-	std::vector<std::vector<PossibleChar> > vectorOfVectorsOfMatchingChars;             // this will be the return value
+ bool isNotChecked(Char a, vector<Char> b) {
+	 for (int i = 0; i < b.size(); i++) {
+		 if (a == b[i])
+			 return false;
+		 else
+			 return true;
+	 }
+ }
 
-	for (auto &possibleChar : vectorOfPossibleChars) {                  // for each possible char in the one big vector of chars
+vector<vector<Char> > findVECofVECofChars(vector<Char> vectorOfPossibleChars) {
+	
+	vector<vector<Char> > vectorOfVectorsOfChars;  
+	vector<Char> alreadyChecked;
+	vector<Char> vectorOfMatchingChars;
 
-																		// find all chars in the big vector that match the current char
-		std::vector<PossibleChar> vectorOfMatchingChars = findVectorOfMatchingChars(possibleChar, vectorOfPossibleChars);
-
-		vectorOfMatchingChars.push_back(possibleChar);          // also add the current char to current possible vector of matching chars
-
-																// if current possible vector of matching chars is not long enough to constitute a possible plate
-		if (vectorOfMatchingChars.size() < MIN_NUMBER_OF_MATCHING_CHARS) {
-			continue;                       // jump back to the top of the for loop and try again with next char, note that it's not necessary
-											// to save the vector in any way since it did not have enough chars to be a possible plate
-		}
-		// if we get here, the current vector passed test as a "group" or "cluster" of matching chars
-		vectorOfVectorsOfMatchingChars.push_back(vectorOfMatchingChars);            // so add to our vector of vectors of matching chars
-
-																					// remove the current vector of matching chars from the big vector so we don't use those same chars twice,
-																					// make sure to make a new big vector for this since we don't want to change the original big vector
-		std::vector<PossibleChar> vectorOfPossibleCharsWithCurrentMatchesRemoved;
-
-		for (auto &possChar : vectorOfPossibleChars) {
-			if (std::find(vectorOfMatchingChars.begin(), vectorOfMatchingChars.end(), possChar) == vectorOfMatchingChars.end()) {
-				vectorOfPossibleCharsWithCurrentMatchesRemoved.push_back(possChar);
+	for (int i = 0; i < vectorOfPossibleChars.size(); i++) {
+		int kkk = 0;
+		Char tempChar = vectorOfPossibleChars[i];
+		if (isNotChecked(tempChar, alreadyChecked)) {
+			vectorOfMatchingChars = findVectorOfMatchingChars(tempChar, vectorOfPossibleChars);
+			for (int i = 0; i < vectorOfMatchingChars.size(); i++) {
+				if (!isNotChecked(vectorOfMatchingChars[i], alreadyChecked)) {
+					kkk = 1;
+				}
+				if (kkk == 0) {
+					alreadyChecked.push_back(tempChar);
+				}
 			}
-		}
-		// declare new vector of vectors of chars to get result from recursive call
-		std::vector<std::vector<PossibleChar> > recursiveVectorOfVectorsOfMatchingChars;
+			if (kkk == 0 && vectorOfMatchingChars.size() != 0)
+				vectorOfVectorsOfChars.push_back(vectorOfMatchingChars);
+				
 
-		// recursive call
-		recursiveVectorOfVectorsOfMatchingChars = findVectorOfVectorsOfMatchingChars(vectorOfPossibleCharsWithCurrentMatchesRemoved);	// recursive call !!
+		}//add the current char to current char
 
-		for (auto &recursiveVectorOfMatchingChars : recursiveVectorOfVectorsOfMatchingChars) {      // for each vector of matching chars found by recursive call
-			vectorOfVectorsOfMatchingChars.push_back(recursiveVectorOfMatchingChars);               // add to our original vector of vectors of matching chars
-		}
-
-		break;		// exit for loop
 	}
 
-	return(vectorOfVectorsOfMatchingChars);
+	return vectorOfVectorsOfChars;
 }
 
 vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 
 	int imagenumber = foldername;
-	Mat imgGrayscale = extractValue(input);                           // extract value channel only from original image to get imgGrayscale
+	Mat imgGrayscale;
+	cvtColor(input, imgGrayscale, COLOR_BGR2GRAY);                          //  get imgGrayscale
 
-	 Mat imgMaxContrastGrayscale = maximizeContrast(imgGrayscale);       // maximize contrast with top hat and black hat
+	Mat imgMaxContrastGrayscale = enhanceBlackOnWhite(imgGrayscale);       // maximize contrast with top hat and black hat
 
-	 Mat imgBlurred;
+	Mat imgBlurred;
 
-	 Mat imgThresh;
-	 GaussianBlur(imgMaxContrastGrayscale, imgBlurred, Size(5,5), 0);          // gaussian blur
+	Mat imgThresh;
+	GaussianBlur(imgMaxContrastGrayscale, imgBlurred, Size(5, 5), 0);          // gaussian blur
 
 	vector<Mat> possiblePlates;
 
 	// call adaptive threshold to get imgThresh
-	 adaptiveThreshold(imgBlurred, imgThresh, 255.0, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 19, 9);
-	
-	if (DEBUG == 0) {
+	adaptiveThreshold(imgBlurred, imgThresh, 255.0, ADAPTIVE_THRESH_GAUSSIAN_C, THRESH_BINARY_INV, 19, 9);
+
+	if (DEBUG == 1) {
 		imshow("threshold", imgThresh);
 		waitKey(0);
 	}
-	
-	vector<PossibleChar> vectorOfPossibleCharsInScene = findPossibleCharsInScene(imgThresh);
-	Mat imgContours2 =  Mat(imgThresh.size(), CV_8UC3, Scalar(0, 0, 0));
-	std::vector<std::vector< Point> > contours;
+
+	vector<Char> vectorOfPossibleCharsInScene = searchAlltheChars(imgThresh);
+	Mat imgContours2 = Mat(imgThresh.size(), CV_8UC3, Scalar(0, 0, 0));
+	vector<vector< Point> > contours;
 
 	for (auto &possibleChar : vectorOfPossibleCharsInScene) {
 		contours.push_back(possibleChar.contour);
@@ -318,137 +285,136 @@ vector<Mat> initialProcessing(Mat input, int foldername, int DEBUG) {
 	imshow("contorni scremati", imgContours2);
 	waitKey(0);
 
-	
-	std::vector<std::vector<PossibleChar> > vectorOfVectorsOfMatchingCharsInScene = findVectorOfVectorsOfMatchingChars(vectorOfPossibleCharsInScene);
 
-	Mat imgContours3 =  Mat(imgThresh.size(), CV_8UC3, Scalar(0, 0, 0));
+	for (int i = 0; i < vectorOfPossibleCharsInScene.size(); i++) {
+		vector<vector<Char> > vectorOfVectorsOfMatchingCharsInScene = findVECofVECofChars(vectorOfPossibleCharsInScene);
 
-	 RNG rng;
+		Mat imgContours3 = Mat(imgThresh.size(), CV_8UC3, Scalar(0, 0, 0));
 
-	 for (int i = 0; i < vectorOfVectorsOfMatchingCharsInScene.size(); i++) {
-	
-		int intRandomBlue = rng.uniform(0, 256);
-		int intRandomGreen = rng.uniform(0, 256);
-		int intRandomRed = rng.uniform(0, 256);
-
-		std::vector<std::vector< Point> > contours;
-
-		/*for (size_t i = 0; i < vectorOfMatchingChars[i].size(); i++) {
-			joined.insert(joined.end(), contours[i].begin(), contours[i].end());
-		}*/
-		//area to check if it is a license plate
-
-		vector<Point> joined;
-		vector<PossibleChar> temp = vectorOfVectorsOfMatchingCharsInScene[i];
-		for (int i = 0; i < temp.size(); i++) {
-			contours.push_back(temp[i].contour);
-			joined.insert(joined.end(), contours[i].begin(), contours[i].end());
-
-		}
-		RotatedRect mr = minAreaRect(joined);
-		drawContours(imgContours3, contours, -1,  Scalar((double)intRandomBlue, (double)intRandomGreen, (double)intRandomRed));
-
-
-		if (DEBUG == 0) {
-			imshow("FINAL CONTOURS", imgContours3);
-			waitKey(0);
-		}
 		int patchnumber = 0;
-		//if (verifySizesContours(mr)) {
 
-		//	RotatedRect minRect;
-		//	// rotated rectangle drawing 
-		//	Point2f rect_points[4]; minRect.points(rect_points);
-		//	//for (int j = 0; j < 4; j++)
-		//	//	line(result, rect_points[j], rect_points[(j + 1) % 4], Scalar(0, 0, 255), 1, 8);
+		for (int i = 0; i < vectorOfVectorsOfMatchingCharsInScene.size(); i++) {
 
-		//	//Get rotation matrix
-		//	float r = (float)minRect.size.width / (float)minRect.size.height;
-		//	float angle = minRect.angle;
-		//	if (r < 1)
-		//		angle = 90 + angle;
-		//	Mat rotmat = getRotationMatrix2D(minRect.center, angle, 1);
+			int intRandomBlue = rand() % 250;
+			int intRandomGreen = rand() % 250;
+			int intRandomRed = rand() % 250;
 
-		//	//Create and rotate image
-		//	Mat img_rotated;
-		//	warpAffine(input, img_rotated, rotmat, input.size(), INTER_CUBIC);
+			vector<vector< Point> > contours;
+			RotatedRect mr;
+			vector<Point> joined;
+			vector<Char> temp;
 
-		//	//Crop image
-		//	Size rect_size = minRect.size;
-		//	if (r < 1)
-		//		swap(rect_size.width, rect_size.height);
-		//	Mat img_crop;
-		//	getRectSubPix(img_rotated, rect_size, minRect.center, img_crop);
+			temp = vectorOfVectorsOfMatchingCharsInScene[i];
+			for (int i = 0; i < temp.size(); i++) {
+				contours.push_back(temp[i].contour);
+				joined.insert(joined.end(), contours[i].begin(), contours[i].end());
 
-		//	Mat resultResized;
-		//	resultResized.create(33, 144, CV_8UC3);
-		//	resize(img_crop, resultResized, resultResized.size(), 0, 0, INTER_CUBIC);
-		//	//Equalize croped image
-		//	Mat grayResult;
-		//	cvtColor(resultResized, grayResult, COLOR_BGR2GRAY);
-		//	blur(grayResult, grayResult, Size(3, 3));
-		//	grayResult = equalizeHist(grayResult);
+			}
+			mr = minAreaRect(joined);
+			drawContours(imgContours3, contours, -1, Scalar((double)intRandomBlue, (double)intRandomGreen, (double)intRandomRed));
 
-		//	if (DEBUG == 1) {
-		//		imshow("result", grayResult);
-		//		waitKey(0);
-		//	}
-		//	possiblePlates.push_back(grayResult);
 
-		//	string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\license-plates\\") + std::to_string(imagenumber) + "-" + std::to_string(patchnumber) + "-possiblelicense.jpg";
-		//	cout << filename << endl;
-		//	patchnumber++;
-		//	try {
-		//		imwrite(filename, grayResult);
-		//		cout << "done" << endl;
+			if (DEBUG == 1) {
+				imshow("FINAL CONTOURS", imgContours3);
+				waitKey(0);
+			}
+			Point2f rect_points[4]; mr.points(rect_points);
+			for (int j = 0; j < 4; j++)
+				line(imgContours3, rect_points[j], rect_points[(j + 1) % 4], Scalar(0, 0, 255), 1, 8);
 
-		//	}
-		//	catch (runtime_error& ex) {
-		//		fprintf(stderr, "exception saving image: %s\n", ex.what());
-		//		return possiblePlates;
-		//	}
-		//}
-		patchnumber++;
+			if (DEBUG == 1) {
+				imshow("FINAL CONTOURS", imgContours3);
+				waitKey(0);
+			}
+
+			if (verifySizesContours(mr) && temp.size() > 4) {
+				//Get rotation matrix
+				float r = (float)mr.size.width / (float)mr.size.height;
+				float angle = mr.angle;
+				if (r < 1)
+					angle = 90 + angle;
+				Mat rotmat = getRotationMatrix2D(mr.center, angle, 1);
+
+				//Create and rotate image
+				Mat img_rotated;
+				warpAffine(input, img_rotated, rotmat, input.size(), INTER_CUBIC);
+
+				//Crop image
+				Size rect_size = mr.size;
+				if (r < 1)
+					swap(rect_size.width, rect_size.height);
+				Mat img_crop;
+				getRectSubPix(img_rotated, rect_size, mr.center, img_crop);
+
+				Mat resultResized;
+				resultResized.create(33, 144, CV_8UC3);
+				resize(img_crop, resultResized, resultResized.size(), 0, 0, INTER_CUBIC);
+				//Equalize croped image
+				Mat grayResult;
+				cvtColor(resultResized, grayResult, COLOR_BGR2GRAY);
+				blur(grayResult, grayResult, Size(3, 3));
+				grayResult = equalizeHist(grayResult);
+
+				if (DEBUG == 1) {
+					imshow("result", grayResult);
+					waitKey(0);
+				}
+				possiblePlates.push_back(grayResult);
+
+				string filename = string("E:\\LeoPrat\\Documents\\License Plate Recognition Git\\LicensePlateRecognition\\Project1\\license-plates\\") + to_string(imagenumber) + "-" + to_string(patchnumber) + "-possiblelicense.jpg";
+				cout << filename << endl;
+				patchnumber++;
+				try {
+					imwrite(filename, grayResult);
+					cout << "done" << endl;
+
+				}
+				catch (runtime_error& ex) {
+					fprintf(stderr, "exception saving image: %s\n", ex.what());
+					cout << "erroraccio" << endl;
+					return possiblePlates;
+				}
+			}
+			//patchnumber++;
+		}
+
+		return possiblePlates;
 	}
-		
-	return possiblePlates;
+
 }
 
+	int main() {
+		srand(time(NULL));
 
+		//possible parameters to change
+		/////////////////////////////// 
+		int DEBUG = 1;
 
-int main() {
-	srand(time(NULL));
+		int IMAGE_NUMBER = 4;
 
-	//possible parameters to change
-	/////////////////////////////// 
-	int DEBUG = 0;
+		String pathdir = "data";
 
-	int IMAGE_NUMBER = rand () % 6;
+		///////////////////////////////
 
-	String pathdir = "data";
+		vector<Mat> input_images = licensePlate(pathdir);
 
-	///////////////////////////////
+		vector<Mat> Licenses = initialProcessing(input_images[IMAGE_NUMBER], IMAGE_NUMBER, DEBUG);
+		if (Licenses.empty()) {
+			imshow("FALLITO", input_images[IMAGE_NUMBER]);
+			waitKey(0);
+			return 0;
+		}
 
-	vector<Mat> input_images = licensePlate(pathdir);
+		vector<int> char_found;
+		for (int i = 0; i < Licenses.size(); i++) {
 
-	vector<Mat> Licenses = initialProcessing(input_images[IMAGE_NUMBER], IMAGE_NUMBER, DEBUG);
-	if (Licenses.empty()) {
-		imshow("FALLITO", input_images[IMAGE_NUMBER]);
+			char_found.push_back(characterProcessing(Licenses[i], i, DEBUG));
+
+		}
+		cout << "END" << endl;
+		imshow("END", Licenses[0]);
+
 		waitKey(0);
+
 		return 0;
 	}
-
-	vector<int> char_found;
-	for (int i = 0; i < Licenses.size(); i++) {
-
-		char_found.push_back(characterProcessing(Licenses[i], i, DEBUG));
-
-	}
-	int index = findMax(char_found);
-	cout << "END" << endl;
-	imshow("END", Licenses[index]);
-	
-	waitKey(0);
-	
-	return 0;
-}
